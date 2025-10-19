@@ -1,0 +1,106 @@
+template:
+  name: retry-system
+  version: "1.0"
+  description: 完整的延迟重试队列系统，包含主队列、重试队列、交换机和绑定关系（基于Quorum队列）
+  author: cody-ozon
+  icon: "🔄"
+  tags:
+    - retry
+    - quorum
+    - system
+    - production
+
+parameters:
+  - name: queue_prefix
+    label: 队列业务名称前缀
+    type: string
+    required: true
+    description: 队列的业务标识前缀，如 'order-service'
+    validation:
+      pattern: "^[a-zA-Z0-9_-]+$"
+
+  - name: vhost
+    label: Virtual Host
+    type: select
+    required: true
+    description: RabbitMQ虚拟主机
+    dataSource:
+      type: vhosts
+
+  - name: main_exchange
+    label: 主交换机名称
+    type: combobox
+    required: true
+    description: "可以选择现有的 topic 类型交换机，或输入新的交换机名称（建议格式: 业务前缀.exchange）。注意：不能使用空字符串或系统内置交换机（amq.*）"
+    dataSource:
+      type: exchanges
+      dependsOn: vhost
+      filter:
+        type: topic
+        durable: true
+
+  - name: routing_key
+    label: Routing Key
+    type: string
+    required: true
+    default: "#"
+    description: "主队列绑定到主交换机的路由键（默认 # 匹配所有消息）"
+
+  - name: retry_delay_ms
+    label: 重试延迟时间 (毫秒)
+    type: number
+    required: true
+    default: 60000
+    description: 重试队列的消息TTL，到期后重新路由到主队列，默认60秒
+    validation:
+      min: 1000
+      max: 86400000
+
+# 交换机定义
+exchanges:
+  - name: "${main_exchange}"
+    type: "topic"
+    durable: true
+    auto_delete: false
+    reuseIfExists: true
+    validateIfExists:
+      type: "topic"
+      durable: true
+
+  - name: "${queue_prefix}.retry.dlx"
+    type: "topic"
+    durable: true
+    auto_delete: false
+
+# 队列定义
+queues:
+  - name: "${queue_prefix}"
+    vhost: "${vhost}"
+    durable: true
+    auto_delete: false
+    arguments:
+      x-queue-type: "quorum"
+      x-dead-letter-exchange: "${queue_prefix}.retry.dlx"
+      x-dead-letter-routing-key: "${queue_prefix}.retry"
+
+  - name: "${queue_prefix}.retry"
+    vhost: "${vhost}"
+    durable: true
+    auto_delete: false
+    arguments:
+      x-queue-type: "quorum"
+      x-message-ttl: ${retry_delay_ms}
+      x-dead-letter-exchange: "${main_exchange}"
+      x-dead-letter-routing-key: "${routing_key}"
+
+# 绑定关系
+bindings:
+  - source: "${main_exchange}"
+    destination: "${queue_prefix}"
+    destination_type: "queue"
+    routing_key: "${routing_key}"
+
+  - source: "${queue_prefix}.retry.dlx"
+    destination: "${queue_prefix}.retry"
+    destination_type: "queue"
+    routing_key: "${queue_prefix}.retry"
