@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { rabbitMQClient } from '@/lib/api'
 import LoginPage from '@/pages/LoginPage'
 import HomePage from '@/pages/HomePage'
@@ -18,7 +18,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <Routes>
         {/* 登录页 - 公开访问 */}
         <Route path="/login" element={<LoginPage />} />
@@ -52,7 +52,7 @@ function App() {
         {/* 其他路径重定向到首页 */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </BrowserRouter>
+    </HashRouter>
   )
 }
 

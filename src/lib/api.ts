@@ -3,6 +3,8 @@
  * 凭证仅存储在内存中，不持久化
  */
 
+import { config } from '@/config'
+
 export interface RabbitMQCredentials {
   username: string
   password: string
@@ -103,7 +105,7 @@ export class RabbitMQClient {
   // 凭证仅存储在内存中 - 私有属性
   private username: string = ''
   private password: string = ''
-  private baseURL: string = '/api'
+  private baseURL: string = config.rabbitmq.apiUrl
 
   // 缓存机制（防止重复请求）
   private vhostsCache: VHost[] | null = null

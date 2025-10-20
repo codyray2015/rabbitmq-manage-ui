@@ -8,8 +8,6 @@ import {
 } from '@/utils/codeTemplates'
 import {
   getSystemCredentials,
-  getDefaultCredential,
-  type Credential,
   type SystemCredentials,
 } from '@/lib/credentialsManager'
 
@@ -27,7 +25,7 @@ interface Binding {
   destination: string
   destination_type: string
   routing_key: string
-  arguments: Record<string, any>
+  arguments?: Record<string, any>
   properties_key: string
 }
 

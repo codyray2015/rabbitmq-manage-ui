@@ -55,9 +55,15 @@ cp .env.example .env
 编辑 `.env` 文件：
 
 ```env
-# RabbitMQ 服务器配置
+# RabbitMQ 主机名（用于生成连接字符串和代码）
 VITE_RABBITMQ_HOST=your-rabbitmq-server.com
-VITE_RABBITMQ_API_URL=https://your-rabbitmq-server.com/rabbitmq
+
+# RabbitMQ Management API URL
+# 方式一：使用完整 URL（推荐 - 无需代理配置）
+VITE_RABBITMQ_API_URL=https://your-rabbitmq-server.com:15672/api
+
+# 方式二：使用相对路径（需要配置反向代理）
+# VITE_RABBITMQ_API_URL=/api
 ```
 
 4. **启动开发服务器**
@@ -149,6 +155,104 @@ npm run build
 
 ```bash
 npm run lint
+```
+
+## 🚀 部署说明
+
+### 路由模式
+
+本应用使用 **Hash 路由模式**（URL 中带 `#`），具有以下优势：
+
+✅ **无需服务器配置** - 不需要配置 rewrite 规则
+✅ **子路径部署友好** - 可以部署到任意路径而无需重新编译
+✅ **灵活移动** - 部署后可以随意移动目录位置
+
+**URL 示例**：
+```
+https://example.com/#/login
+https://example.com/rabbitmq-ui/#/login
+https://example.com/admin/tools/rmq/#/login
+```
+
+### API 配置模式
+
+#### 模式一：直连 RabbitMQ（推荐）
+
+**优势**: 配置超简单，无需反向代理
+
+**环境变量配置**：
+```env
+VITE_RABBITMQ_API_URL=https://rmq.example.com:15672/api
+```
+
+**Caddy 配置**（只需静态文件服务）：
+```caddy
+example.com {
+    # 根路径部署
+    root * /var/www/rabbitmq-manage/dist
+    file_server
+}
+
+# 或子路径部署
+example.com {
+    handle_path /rabbitmq-ui* {
+        root * /var/www/rabbitmq-manage/dist
+        file_server
+    }
+}
+```
+
+**注意**: 需要确保 RabbitMQ Management Plugin 允许 CORS。如果需要配置 CORS，参考：
+```bash
+# rabbitmq.conf
+management.cors.allow_origins.1 = https://example.com
+management.cors.allow_origins.2 = https://*.example.com
+```
+
+---
+
+#### 模式二：通过代理访问
+
+**优势**: 无需配置 CORS，所有请求同源
+
+**环境变量配置**：
+```env
+VITE_RABBITMQ_API_URL=/api
+```
+
+**Caddy 配置**：
+```caddy
+example.com {
+    # 静态文件服务
+    root * /var/www/rabbitmq-manage/dist
+    file_server
+
+    # API 代理到 RabbitMQ
+    handle /api/* {
+        reverse_proxy localhost:15672
+    }
+}
+```
+
+### Nginx 配置示例
+
+```nginx
+# 根路径部署
+location / {
+    root /var/www/rabbitmq-manage/dist;
+    try_files $uri $uri/ /index.html;
+}
+
+# 子路径部署
+location /rabbitmq-ui {
+    alias /var/www/rabbitmq-manage/dist;
+    try_files $uri $uri/ /rabbitmq-ui/index.html;
+}
+
+# API 代理
+location /api {
+    proxy_pass http://localhost:15672;
+}
 ```
 
 ## 🔒 安全说明
